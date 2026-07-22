@@ -1,0 +1,10 @@
+[project]
+name = "redis-tui"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "redis>=8.0.1",
+    "textual>=8.2.8",
+]
