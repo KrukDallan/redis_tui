@@ -6,7 +6,7 @@ You can think of this program as a "redis-cli on steroids". I use redis a lot an
 
 Currently the easiest way to install it is through uv.
 
-After cloning the repo enter the folder you just cloned and type this:
+After cloning the repo enter the folder you just cloned and type this command:
 
 `uv tool install --editable .`
 
