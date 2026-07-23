@@ -2,15 +2,15 @@
 
 You can think of this program as a "redis-cli on steroids". I use redis a lot and I prefer interacting with it from the terminal. The standard redis-cli however is quite clunky and tedious to use, so I decided to make this simple tui to make the redis-terminal experience a little more nice and easy. 
 
-### Installation (not quite)
+### Installation
 
-After cloning the repo add this line in your .bashrc or .zshrc file:
+Currently the easiest way to install it is through uv.
 
-`alias tredis="uv run --directory path/to/cloned/folder main.py"`
+After cloning the repo enter the folder you just cloned and type this:
 
-Of course you can change the command from "tredis" to something else of your liking.
+`uv tool install --editable .`
 
-After that just `source` your .bashrc or .zshrc and that's it, enjoy your redis tui!
+Now you can use the command `tredis` from your terminal to open the tui.
 
 ### How to use it
 

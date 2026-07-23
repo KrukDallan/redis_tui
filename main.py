@@ -1,7 +1,7 @@
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Header, Footer, Input, Label
 from rich.text import Text
-from redis_utils import RedisDataHelper
+from utils.redis_utils import RedisDataHelper
 from textual.screen import ModalScreen
 from textual.containers import Vertical
 
@@ -252,6 +252,6 @@ class RedisTermanApp(App):
                 table.add_row(Text(key, justify="left"), Text(val_str, justify="left"), key=key)
 
 
-if __name__ == "__main__":
-    app = RedisTermanApp()
-    app.run()
+#if __name__ == "__main__":
+app = RedisTermanApp()
+app.run()
