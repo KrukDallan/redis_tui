@@ -3,7 +3,7 @@ from textual.widgets import DataTable, Header, Footer, Input, Label
 from rich.text import Text
 from redis_utils import RedisDataHelper
 from textual.screen import ModalScreen
-from textual.containers import Vertical, Horizontal
+from textual.containers import Vertical
 
 class EditValueScreen(ModalScreen[str]):
     """Modal dialog screen to edit a Redis value."""
@@ -57,10 +57,38 @@ class AddKeyScreen(ModalScreen[str]):
         self.dismiss((key_val, val_val))
 
     def key_escape(self) -> None:
-        # Cancel without saving if ESC is pressed
         self.dismiss(None)
 
+class ConfirmDeleteScreen(ModalScreen[bool]):
+    """Modal dialog screen to confirm key deletion."""
+
+    def __init__(self, key_name: str) -> None:
+        super().__init__()
+        self.key_name = key_name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label(f"Are you sure you want to delete '[bold red]{self.key_name}[/bold red]'?")
+            yield Label("[dim]Press Enter / Y to Delete | ESC / N to Cancel[/dim]")
+
+    def key_y(self) -> None:
+        """Confirm deletion when 'y' is pressed."""
+        self.dismiss(True)
+
+    def key_enter(self) -> None:
+        """Confirm deletion when Enter is pressed."""
+        self.dismiss(True)
+
+    def key_n(self) -> None:
+        """Cancel deletion when 'n' is pressed."""
+        self.dismiss(False)
+
+    def key_escape(self) -> None:
+        """Cancel deletion when ESC is pressed."""
+        self.dismiss(False)
+
 class RedisTermanApp(App):
+    CSS_PATH = "redis.tcss"
     BINDINGS = [("q", "quit", "Quit"),
                 ("a", "add_key", "Add new key"),
                 ("x", "remove_key", "Remove focused key")]
@@ -87,11 +115,17 @@ class RedisTermanApp(App):
         row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
         key_name = str(row_key.value)
 
-        try:
-            self.rdh.client.delete(key_name)
-            #self.notify(f"Deleted '{key_name}' from Redis", severity="information")
-        except Exception as e:
-            self.notify(f"Failed to delete key: {e}", severity="error")
+        def handle_confirm_result(confirmed: bool | None) -> None:
+            if confirmed:
+                try:
+                    self.rdh.client.delete(key_name)
+                except Exception as e:
+                    self.notify(f"Failed to delete key: {e}", severity="error")
+
+        self.push_screen(
+            ConfirmDeleteScreen(key_name),
+            callback=handle_confirm_result
+        )
     
 
     def action_add_key(self):
@@ -107,31 +141,50 @@ class RedisTermanApp(App):
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
-        table.add_column(Text("Key", justify="center"), key="key")
-        table.add_column(Text("Value", justify="center"), key="value")
+        table.zebra_stripes = True
+        table_width = table.size.width or self.console.width
+        col_width = min(25, (table_width // 2) - 1)
+        table.add_column(Text("Key", justify="left", style="bold orange1"), key="key", width=col_width)
+        table.add_column(Text("Value", justify="left", style="bold bright_cyan"), key="value", width=col_width)
 
         self.rdh = RedisDataHelper()
 
         initial_data = self.rdh.get_all_keys_and_values()
         for key, val in initial_data.items():
             table.add_row(
-                Text(str(key), justify="left", tab_size=2),
-                Text(str(val), justify="right"),
+                Text(str(key), justify="left",),
+                Text(str(val), justify="left"),
                 key=key,
             )
 
         try:
             self.rdh.client.config_set("notify-keyspace-events", "KEA")
-            #self.notify("Keyspace notifications enabled!", severity="information")
         except Exception as e:
             self.notify(f"Could not enable config: {e}", severity="warning")
 
         self.run_worker(self.listen_to_redis_events, thread=True, exclusive=True)
 
+    def on_resize(self, event) -> None:
+        """Triggered automatically whenever the terminal window is resized."""
+        table = self.query_one(DataTable)
+        
+        if not table.columns:
+            return
+
+        total_width = event.size.width - 8
+        key_width = max(10, int(total_width * 0.3))
+        value_width = max(15, int(total_width * 0.7))
+
+        if "key" in table.columns:
+            table.columns["key"].width = key_width
+        if "value" in table.columns:
+            table.columns["value"].width = value_width
+        # Force the table to re-render layout
+        table.refresh(layout=True)
+
 
     def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
         """Triggered when user presses ENTER on a cell."""
-        # Only allow editing if the user clicked/selected a cell in the 'value' column
 
         if event.cell_key.column_key.value == "value":
             row_key = event.cell_key.row_key.value
@@ -150,7 +203,6 @@ class RedisTermanApp(App):
     def save_value_to_redis(self, key: str, new_value: str) -> None:
         try:
             self.rdh.client.set(key, new_value)
-            #self.notify(f"Updated key '{key}' in Redis!", severity="information")
         except Exception as e:
             self.notify(f"Failed to update Redis: {e}", severity="error")
 
@@ -179,15 +231,12 @@ class RedisTermanApp(App):
         table = self.query_one(DataTable)
 
         if event_type in ("del", "expired"):
-            # Remove row if key was deleted
             if key in table.rows:
                 table.remove_row(key)
-                #self.notify(f"Deleted key: {key}", severity="error")
 
         elif event_type in ("set", "hset", "lpush", "rpush", "sadd"):
             new_type = self.rdh.client.type(key)
             
-            # Fetch value based on type
             if new_type == "string":
                 val = self.rdh.client.get(key)
             elif new_type == "hash":
@@ -198,9 +247,9 @@ class RedisTermanApp(App):
             val_str = str(val)
 
             if key in table.rows:
-                table.update_cell(row_key=key, column_key="value", value=Text(val_str, justify="right"))
+                table.update_cell(row_key=key, column_key="value", value=Text(val_str, justify="left"))
             else:
-                table.add_row(Text(key, justify="left"), Text(val_str, justify="right"), key=key)
+                table.add_row(Text(key, justify="left"), Text(val_str, justify="left"), key=key)
 
 
 if __name__ == "__main__":

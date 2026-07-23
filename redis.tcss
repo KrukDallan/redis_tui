@@ -1,0 +1,8 @@
+Screen {
+    align: center top; /* Horizontally center, vertically middle */
+}
+DataTable {
+    width: 100%; /* Or fixed: 80 */
+    height: auto;
+    border: round navajowhite;
+}
